@@ -14,8 +14,12 @@ Presiona el botón Send Love. ¿Qué pasa? = muestra un corazon
 
 funciona con is_pressed() por que el sistema reconoce cada vez que se presiona y no si se presiono alguna vez como lo hace was_pressed()
 
+## Bitácora de aplicación 
+
 ### Actividad 05
 
+
+```js
 let port;
 let connectBtn;
 let posX=0;
@@ -62,13 +66,14 @@ function connectBtnClick() {
     port.close();
   }
 }
+```
 
+```py
 
-
-## Bitácora de aplicación 
-
+```
 
 
 ## Bitácora de reflexión
+
 
 
