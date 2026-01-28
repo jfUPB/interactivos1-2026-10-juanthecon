@@ -7,11 +7,14 @@
 Primer texto de la actividad 1
 
 ### Actividad 03
-Sacude el micro:bit. ¿Qué pasa? = 
-Presiona el botón Send Love. ¿Qué pasa?
+Sacude el micro:bit. ¿Qué pasa? = cambia a verde
+Presiona el botón Send Love. ¿Qué pasa? = muestra un corazon
+
+### Actividad 04
+
+funciona con is_pressed() por que el sistema reconoce cada vez que se presiona y no si se presiono alguna vez como lo hace was_pressed()
 
 ### Actividad 05
-
 
 let port;
 let connectBtn;
@@ -25,19 +28,20 @@ function setup() {
   connectBtn.position(130, 300);
   connectBtn.mousePressed(connectBtnClick);
   fill("white");
-  ellipse(300, 100, 100, 100);
+  ellipse(50, 200, 100, 100);
 }
 
 function draw() {
   if (port.availableBytes() > 0) {
     let dataRx = port.read(1);
     if (dataRx == "A") {
-      posX = posX-20;
+      posX = posX-30;
       
       
     } else if (dataRx == "B") {
-      posX = posX+20;
+      posX = posX+30;
     }
+    
 
     background(220);
     ellipse(posX, 200, 100, 100);
@@ -66,4 +70,5 @@ function connectBtnClick() {
 
 
 ## Bitácora de reflexión
+
 
