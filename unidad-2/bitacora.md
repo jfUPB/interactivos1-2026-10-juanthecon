@@ -8,6 +8,9 @@
 ¿Cuáles son los eventos en el programa?
 ¿Cuáles son las acciones en el programa?
 
+### Actividad 02
+
+```jav
 Estados: estado_waitTimeout
 
 Eventos: ENTRY, EXIT, Timeout
@@ -140,9 +143,12 @@ while True:
     
     semaforo1.update()
     utime.sleep_ms(20)
+```
+
 ## Bitácora de aplicación 
 
 
 
 ## Bitácora de reflexión
+
 
