@@ -311,5 +311,199 @@ while True:
 
 ## Bitácora de reflexión
 
+### Actividad 05
+
+codigo microbit
+
+```jav
+from microbit import *
+import utime
+import music
+
+def make_fill_images(on='9', off='0'):
+    imgs = []
+    for n in range(26):
+        rows = []
+        k = 0
+        for y in range(5):
+            row = []
+            for x in range(5):
+                row.append(on if k < n else off)
+                k += 1
+            rows.append(''.join(row))
+        imgs.append(Image(':'.join(rows)))
+    return imgs
+
+FILL = make_fill_images()
+
+class Timer:
+    def __init__(self, owner, event_to_post, duration):
+        self.owner = owner
+        self.event = event_to_post
+        self.duration = duration
+        self.start_time = 0
+        self.active = False
+
+    def start(self, new_duration=None):
+        if new_duration is not None:
+            self.duration = new_duration
+        self.start_time = utime.ticks_ms()
+        self.active = True
+
+    def stop(self):
+        self.active = False
+
+    def update(self):
+        if self.active:
+            if utime.ticks_diff(utime.ticks_ms(), self.start_time) >= self.duration:
+                self.active = False
+                self.owner.post_event(self.event)
+
+class Task:
+    def __init__(self):
+        self.event_queue = []
+        self.timers = []
+        self.timerSeg = self.createTimer("Timeout", 1000)
+
+        self.valor = 20   # pixeles iniciales
+        self.contador = 0 # para cuenta regresiva
+        self.estado_actual = None
+        self.transicion_a(self.estado_config)
+
+    def createTimer(self, event, duration):
+        t = Timer(self, event, duration)
+        self.timers.append(t)
+        return t
+
+    def post_event(self, ev):
+        self.event_queue.append(ev)
+
+    def update(self):
+        for t in self.timers:
+            t.update()
+        while len(self.event_queue) > 0:
+            ev = self.event_queue.pop(0)
+            if self.estado_actual:
+                self.estado_actual(ev)
+
+    def transicion_a(self, nuevo_estado):
+        if self.estado_actual: self.estado_actual("EXIT")
+        self.estado_actual = nuevo_estado
+        self.estado_actual("ENTRY")
+
+
+    
+    def estado_config(self, ev):
+        if ev == "ENTRY":
+            self.valor = 20
+            display.show(FILL[self.valor])
+        elif ev == "a":
+            if self.valor < 25:
+                self.valor += 1
+                display.show(FILL[self.valor])
+        elif ev == "b":
+            if self.valor > 15:
+                self.valor -= 1
+                display.show(FILL[self.valor])
+        elif ev == "s":
+            self.contador = self.valor
+            self.transicion_a(self.estado_armado)
+
+
+
+    
+    def estado_armado(self, ev):
+        if ev == "ENTRY":
+            self.timerSeg.start()
+        elif ev == "Timeout":
+            self.contador -= 1
+            display.show(FILL[self.contador])
+            if self.contador > 0:
+                self.timerSeg.start()
+            else:
+                self.transicion_a(self.estado_final)
+
+
+    
+    def estado_final(self, ev):
+        if ev == "ENTRY":
+            display.show(Image.SKULL)
+            music.play(music.POWER_DOWN)
+        elif ev == "a":
+            self.transicion_a(self.estado_config)
+
+
+task = Task()
+
+while True:
+
+    if button_a.was_pressed():
+        task.post_event("a")
+    if button_b.was_pressed():
+        task.post_event("b")
+    if accelerometer.was_gesture("shake"):
+        task.post_event("s")
+
+    
+    if uart.any():
+        dato = uart.read(1)
+        if dato:
+            letra = chr(dato[0])
+            if letra in ["a","b","s"]:
+                task.post_event(letra)
+
+    task.update()
+    utime.sleep_ms(20)
+```
+
+
+se agregó la funcionalidad para leer las letras que llegan a el serial
+
+
+codigo p5.js
+
+``` jav
+let port;
+let connectBtn;
+let writer;
+
+function setup() {
+    createCanvas(400, 400);
+    background(220);
+    port = createSerial();
+    connectBtn = createButton('Connect to micro:bit');
+    connectBtn.position(80, 300);
+    connectBtn.mousePressed(connectBtnClick);
+}
+
+function connect() {
+
+    if (!port.opened()) {
+        connectBtn.html('Connect to micro:bit');
+    }
+    else {
+        connectBtn.html('Disconnect');
+    }
+}
+
+function connectBtnClick() {
+    if (!port.opened()) {
+        port.open('MicroPython', 115200);
+    } else {
+        port.close();
+    }
+}
+
+function keyPressed() {
+  if (port.opened){
+    if (key === 'a' || key === 'b' || key === 's'){
+      port.write(key);
+    }
+  }
+}
+```
+
+detecta si se ecribe las letras a,b,s y las envia por el seria a el microbit
+
 
 
