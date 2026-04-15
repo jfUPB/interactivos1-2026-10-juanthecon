@@ -1,5 +1,82 @@
 # unidad 5
 
+
+``` py
+from microbit import *
+import struct
+import time
+
+# Configuración UART para serial
+uart.init(baudrate=115200)
+
+def calculate_checksum(bytes_1_to_6):
+    """Calcula checksum: suma de bytes 1-6 % 256"""
+    return sum(bytes_1_to_6) % 256
+
+def build_binary_packet(x, y, btn_a, btn_b):
+    """
+    Construye paquete binario de 8 bytes según especificación:
+    Byte 0:   0xAA (header)
+    Bytes 1-2: int16 BE (acelerómetro X)
+    Bytes 3-4: int16 BE (acelerómetro Y)
+    Byte 5:   uint8 (botón A: 1 o 0)
+    Byte 6:   uint8 (botón B: 1 o 0)
+    Byte 7:   uint8 (checksum)
+    """
+    # Asegurar que los valores están en rango válido
+    x = max(-2048, min(2047, int(x)))
+    y = max(-2048, min(2047, int(y)))
+    
+    # Convertir valores de acelerómetro a int16 big-endian
+    x_bytes = struct.pack('>h', x)  # big-endian signed short
+    y_bytes = struct.pack('>h', y)
+    
+    btn_a_byte = 1 if btn_a else 0
+    btn_b_byte = 1 if btn_b else 0
+    
+    # Calcular checksum de bytes 1-6
+    checksum_data = x_bytes + y_bytes + bytes([btn_a_byte, btn_b_byte])
+    checksum = calculate_checksum(checksum_data)
+    
+    # Construir paquete completo
+    packet = bytes([0xAA]) + checksum_data + bytes([checksum])
+    
+    return packet
+
+def main():
+    """Loop principal: Lee sensores y envía datos cada 100ms (10 Hz)"""
+    display.show(Image.HAPPY)  # Indicador visual de inicio
+    
+    last_send = time.ticks_ms()
+    send_interval = 100  # milisegundos (10 Hz)
+    
+    while True:
+        current_time = time.ticks_ms()
+        
+        # Enviar datos cada 100ms
+        if time.ticks_diff(current_time, last_send) >= send_interval:
+            last_send = current_time
+            
+            # Leer acelerómetro (valores en mG, normalmente -2048 a 2047)
+            x = accelerometer.get_x()
+            y = accelerometer.get_y()
+            
+            # Leer botones
+            btn_a_pressed = button_a.is_pressed()
+            btn_b_pressed = button_b.is_pressed()
+            
+            # Construir y enviar paquete
+            packet = build_binary_packet(x, y, btn_a_pressed, btn_b_pressed)
+            uart.write(packet)
+            
+            # Debug opcional (descomentar para ver en terminal)
+            # packet_hex = ''.join('{:02X}'.format(b) for b in packet)
+            # print("TX: {}".format(packet_hex))
+
+# Ejecutar programa
+if __name__ == "__main__":
+    main()
+```
 ---
 
 ## 1. Tabla Comparativa
