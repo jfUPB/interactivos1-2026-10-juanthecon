@@ -1,53 +1,133 @@
-# Unidad 4
-
-## Bitácora de reflexión
+# unidad 5
 
 
 
+## 📋 Tabla de Contenidos
+
+1. [Arquitectura General del Sistema](#1-arquitectura-general-del-sistema)
+2. [Transformación de Datos a Través del Sistema](#2-transformación-de-datos-a-través-del-sistema)
+3. [Máquina de Estados Finitos (FSM)](#3-máquina-de-estados-finitos-fsm)
+4. [Protocolo Serial ASCII - Especificación y Validación](#4-protocolo-serial-ascii---especificación-y-validación)
+5. [Transformaciones Matemáticas y Cálculo de Vértices](#5-transformaciones-matemáticas-y-cálculo-de-vértices)
+6. [Arquitectura de Componentes y Clases](#6-arquitectura-de-componentes-y-clases)
+7. [Diagrama de Secuencia - Flujo Temporal Completo](#7-diagrama-de-secuencia---flujo-temporal-completo)
+8. [Vista Integrada del Sistema - Todas las Capas](#8-vista-integrada-del-sistema---todas-las-capas)
+9. [Capas del Sistema - Responsabilidades Diferenciadas](#9-capas-del-sistema---responsabilidades-diferenciadas)
+
+---
 
 ## 1. Arquitectura General del Sistema
 
 ```mermaid
-graph LR
-    subgraph FLOW["FLUJO DE DATOS A TRAVÉS DEL SISTEMA"]
-        direction LR
-        
-        H1["<b>HARDWARE</b><br/>Valores Crudos<br/><br/>acélX: -245<br/>acélY: 12<br/>btnA: 1<br/>btnB: 0<br/>T: 45020ms"]
-        
-        H2["<b>PUERTO SERIAL</b><br/>Bytes ASCII<br/><br/>$ T : 4 5 0 2 0<br/>| X : - 2 4 5<br/>| Y : 1 2<br/>| A : 1<br/>| B : 0<br/>| C H K : 2 5 8 \\n"]
-        
-        H3["<b>BUFFER</b><br/>Acumula<br/><br/>buf += chunk<br/>buf.indexOf('\\n')<br/>extract line"]
-        
-        H4["<b>FRAME</b><br/>Trama Completa<br/><br/>$T:45020|X:-245|Y:12<br/>|A:1|B:0|CHK:258\\n"]
-        
-        H5["<b>PARSER</b><br/>Parse Campos<br/><br/>T: 45020<br/>X: -245<br/>Y: 12<br/>A: 1<br/>B: 0<br/>CHK: 258"]
-        
-        H6["<b>VALIDATOR</b><br/>Checksum<br/><br/>calc = |-245|+|12|+1+0<br/>     = 245+12+1+0<br/>     = 258<br/>✓ CHK==calc"]
-        
-        H7["<b>CONTRATO</b><br/>JSON Estándar<br/><br/>{<br/>  x: -245,<br/>  y: 12,<br/>  btnA: true,<br/>  btnB: false<br/>}"]
-        
-        H8["<b>BROADCAST</b><br/>WebSocket<br/><br/>{<br/>  type: 'microbit',<br/>  x: -245,<br/>  y: 12,<br/>  btnA: true,<br/>  btnB: false,<br/>  t: 45020<br/>}"]
-        
-        H9["<b>rxData</b><br/>Mapeado Canvas<br/><br/>x: map(-245,<br/>   -2048,2047,<br/>   0,1920)<br/> = 234px<br/><br/>y: map(12,<br/>   -2048,2047,<br/>   0,1080)<br/> = 540px<br/><br/>btnA: true<br/>btnB: false"]
-        
-        H10["<b>generativeState</b><br/>Parámetros Gráficos<br/><br/>resolution=<br/>int(map(540+100,<br/>   0,1080,2,10))<br/> = 7<br/><br/>radius=<br/>234-960= -726<br/><br/>shouldDraw: true<br/>shouldFill: false"]
-        
-        H11["<b>RENDER</b><br/>Cálculo Vértices<br/><br/>angle = TAU/7 ≈ 90°<br/>v0: cos(0)*-726,    sin(0)*-726<br/>v1: cos(90°)*-726,  sin(90°)*-726<br/>v2: cos(180°)*-726, sin(180°)*-726<br/>..."]
-        
-        H12["<b>CANVAS</b><br/>Polígono Dibujado<br/><br/>beginShape()<br/>vertex(-726, 0)<br/>vertex(0, -726)<br/>vertex(726, 0)<br/>vertex(0, 726)<br/>endShape()"]
-        
-        H1 -->|Serial 115200| H2
-        H2 -->|chunk events| H3
-        H3 -->|indexOf \\n| H4
-        H4 -->|parse| H5
-        H5 -->|validate| H6
-        H6 -->|emit| H7
-        H7 -->|broadcast| H8
-        H8 -->|WS recv| H9
-        H9 -->|calculate| H10
-        H10 -->|trigonometry| H11
-        H11 -->|p5.js| H12
+graph TB
+    subgraph HARDWARE["🔧 CAPA FÍSICA - HARDWARE"]
+        MICROBIT["<b>micro:bit V2</b><br/>Acelerómetro + Botones<br/>115200 baud"]
+        SENSORS["<b>Sensores</b><br/>• Acelerómetro 3-ejes (X,Y,Z)<br/>• Botón A<br/>• Botón B<br/>• RTC (Real Time Clock)"]
+        MICROBIT ---|Datos cada 100ms<br/>10 Hz| SENSORS
     end
+
+    subgraph TRANSPORT["🌐 CAPA DE TRANSPORTE - PUERTO SERIAL"]
+        SERIAL["<b>Puerto Serial</b><br/>COM5 @115200 baud<br/>8-N-1"]
+        FRAMEBUFFER["<b>Buffer de Trama</b><br/>Acumula bytes hasta \\n"]
+        PROTOCOL["<b>Protocolo ASCII</b><br/><br/>$T:timestamp|X:acel_x|Y:acel_y<br/>|A:btn_a|B:btn_b|CHK:checksum\\n"]
+        
+        SENSORS -->|TX ASCII bytes| SERIAL
+        SERIAL -->|chunk events| FRAMEBUFFER
+        FRAMEBUFFER -->|rawLine| PROTOCOL
+    end
+
+    subgraph ADAPTER["⚙️ CAPA DE ADAPTACIÓN - PARSE & VALIDACIÓN"]
+        V2ADAPTER["<b>MicrobitV2Adapter</b><br/>(extends BaseAdapter)"]
+        PARSER["<b>parseAsciiFrame()</b><br/>Extrae campos del protocolo<br/>• T: timestamp<br/>• X, Y: [-2048, 2047]<br/>• A, B: 0|1<br/>• CHK: suma"]
+        VALIDATOR["<b>Validación Checksum</b><br/>Calcula: |X| + |Y| + A + B<br/>Compara con CHK recibido"]
+        STANDARDIZE["<b>Contrato Estándar</b><br/>{<br/>&nbsp;&nbsp;x: int,<br/>&nbsp;&nbsp;y: int,<br/>&nbsp;&nbsp;btnA: bool,<br/>&nbsp;&nbsp;btnB: bool<br/>}"]
+        CORRUPT["<b>Trama Corrupta</b><br/>console.warn()<br/>Descarta silenciosamente"]
+        
+        PROTOCOL -->|rawLine| V2ADAPTER
+        V2ADAPTER -->|_onChunk()| PARSER
+        PARSER -->|parsed| VALIDATOR
+        VALIDATOR -->|✓ Valid| STANDARDIZE
+        VALIDATOR -->|✗ Invalid| CORRUPT
+    end
+
+    subgraph SERVER["🖥️ CAPA DE SERVIDOR - Node.js WebSocket"]
+        BRIDGE["<b>bridgeServer.js</b><br/>WebSocket Server<br/>localhost:8081"]
+        BROADCAST["<b>broadcast()</b><br/>Envía a todos los clientes<br/>conectados"]
+        WSJSON["<b>Mensaje WebSocket</b><br/>{<br/>&nbsp;&nbsp;type: 'microbit',<br/>&nbsp;&nbsp;x: int,<br/>&nbsp;&nbsp;y: int,<br/>&nbsp;&nbsp;btnA: bool,<br/>&nbsp;&nbsp;btnB: bool,<br/>&nbsp;&nbsp;t: timestamp<br/>}"]
+        
+        STANDARDIZE -->|adapter.onData()| BRIDGE
+        BRIDGE -->|broadcast()| BROADCAST
+        BROADCAST -->|send JSON| WSJSON
+    end
+
+    subgraph CLIENT["🌐 CAPA DE CLIENTE - Navegador p5.js"]
+        BRIDGECLIENT["<b>bridgeClient.js</b><br/>WebSocket Cliente"]
+        EVENTS["<b>EVENTS.DATA</b><br/>Evento disparado"]
+        PAYLOAD["<b>Payload</b><br/>{<br/>&nbsp;&nbsp;x: int,<br/>&nbsp;&nbsp;y: int,<br/>&nbsp;&nbsp;btnA: bool,<br/>&nbsp;&nbsp;btnB: bool<br/>}"]
+        
+        WSJSON -->|WS message| BRIDGECLIENT
+        BRIDGECLIENT -->|parseJSON| EVENTS
+        EVENTS -->|ev.payload| PAYLOAD
+    end
+
+    PAYLOAD -->|bridge.onData()| FSM
+    
+    subgraph FSM["🎯 CAPA DE ESTADO - Máquina de Estados"]
+        FSMMAIN["<b>PainterTask (FSM)</b><br/>Finite State Machine"]
+        STATE_WAIT["<b>estado_esperando</b><br/>• Espera conexión<br/>• Muestra cursor"]
+        STATE_RUN["<b>estado_corriendo</b><br/>• Activo<br/>• Cursor oculto"]
+        STATE_TRANS["EVENTS.CONNECT"]
+        
+        FSMMAIN ---|Initial| STATE_WAIT
+        STATE_WAIT ---|EVENTS.CONNECT| STATE_TRANS
+        STATE_TRANS -->|transitionTo()| STATE_RUN
+        
+        PAYLOAD -->|postEvent(DATA)| STATE_RUN
+        STATE_RUN -->|ev.type === DATA| UPDATELOGIC
+        
+        subgraph UPDATELOGIC["📥 updateLogic(data)"]
+            RXDATA["<b>rxData</b><br/>Datos mapeados<br/>x, y: [0, width/height]<br/>btnA, btnB: bool<br/>ready: bool"]
+            GENSTATE["<b>generativeState</b><br/>circleResolution: [2,10]<br/>radius: pixel distance<br/>shouldDraw: bool<br/>shouldFill: bool<br/>polygonPoints: array"]
+            MAPX["map(X, -2048, 2047,<br/>0, width)"]
+            MAPY["map(Y, -2048, 2047,<br/>0, height)"]
+            RESOLUTION["circleResolution =<br/>int(map(Y+100, 0, height, 2, 10))"]
+            RADIUS["radius =<br/>X - width/2"]
+            
+            PAYLOAD -->|data| RXDATA
+            RXDATA -->|Store| MAPX
+            RXDATA -->|Store| MAPY
+            MAPX & MAPY -->|Transform| RESOLUTION
+            MAPX & MAPY -->|Transform| RADIUS
+            RESOLUTION & RADIUS -->|Store| GENSTATE
+        end
+    end
+
+    GENSTATE -->|read| DRAWRUNNING
+    
+    subgraph RENDER["🎨 CAPA DE RENDER - p5.js Canvas"]
+        DRAWRUNNING["<b>drawRunning()</b><br/>Ejecuta cada frame"]
+        PUSHPOP["push() / pop()<br/>Salva matriz de transformación"]
+        TRANSLATE["translate(width/2, height/2)<br/>Centra en canvas"]
+        CONDITION["if (shouldDraw &&<br/>ready)"]
+        FILL["if (shouldFill)<br/>fill(34, 45, 122, 50)<br/>else noFill()"]
+        LOOP["for (i=0; i<=circleResolution)<br/>angle = TAU/circleResolution"]
+        VERTEX["x = cos(angle*i)*radius<br/>y = sin(angle*i)*radius<br/>vertex(x, y)"]
+        SHAPE["beginShape()<br/>... vertices ...<br/>endShape()"]
+        
+        DRAWRUNNING -->|every frame| CONDITION
+        CONDITION -->|true| PUSHPOP
+        PUSHPOP -->|init| TRANSLATE
+        TRANSLATE -->|prepare| FILL
+        FILL -->|style| SHAPE
+        LOOP -->|calculate| VERTEX
+        VERTEX -->|add| SHAPE
+    end
+
+    SHAPE -->|render| CANVAS["<b>Canvas 720x720</b><br/>Polígono generativo"]
+    
+    CANVAS -->|visual feedback| USER["👁️ Usuario"]
+    USER -->|tilt device| SENSORS
+    USER -->|press buttons| SENSORS
 ```
 
 ### Descripción
@@ -420,19 +500,20 @@ graph TB
                 
                 DRAW["draw()<br/>────────────<br/>Cada frame:<br/><br/>1. painter.update()<br/>   Procesa cola eventos<br/><br/>2. renderer.get(painter.state)<br/>   Ejecuta función mappeda<br/>   (drawRunning)"]
                 
-                DRAWRUNNING["drawRunning()<br/>────────────<br/>Lee: generativeState<br/>Si shouldDraw:<br/><br/>  • push() / translate()<br/>  • Calcula fill/noFill<br/>  • beginShape()<br/>  • Loop trigonométrico:<br/>    for(i≤circleResolution)<br/>      angle = TAU/res<br/>      x=cos(angle*i)*radius<br/>      y=sin(angle*i)*radius<br/>      vertex(x,y)<br/>  • endShape()\n  • pop()"]
+                DRAWRUNNING["drawRunning()<br/>────────────<br/>Lee: generativeState<br/>Si shouldDraw:<br/><br/>  • push() / translate()<br/>  • Calcula fill/noFill<br/>  • beginShape()<br/>  • Loop trigonométrico:<br/>    for(i≤circleResolution)<br/>      angle = TAU/res<br/>      x=cos(angle*i)*radius<br/>      y=sin(angle*i)*radius<br/>      vertex(x,y)<br/>  • endShape()<br/>  • pop()"]
                 
                 SETUP -->|Inicializa| DRAW
                 DRAW -->|Ejecuta| DRAWRUNNING
             end
             
-            BRIDGECLIENT -->|ev.payload| FSM_CLASS
-            FSM_CLASS -->|lee| DRAWRUNNING
+            BRIDGECLIENT -->|EVENTS.DATA| FSM_CLASS
+            FSM_CLASS -->|update state| DRAW
         end
         
         DEVICE -->|Serial 115200| V2ADAPTER
         BRIDGESVR -->|WS JSON| BRIDGECLIENT
 ```
+
 ### Descripción
 
 Arquitectura de clases y componentes:
@@ -653,8 +734,8 @@ graph TB
         USER -->|Interactúa| DEVICE
         DEVICE -->|Genera datos| SENSORS
         SENSORS -->|Serial ASCII| SERIAL
-        SERIAL -->|Bytes| PROTOCOL
-        PROTOCOL -->|Bytes acumulados| BUFFER
+        SERIAL -->|raw bytes| BUFFER
+        PROTOCOL -.-> BUFFER
         BUFFER -->|rawLine| PARSER
         PARSER -->|parsed fields| VALIDATOR
         VALIDATOR -->|✓ Valid| CONTRACT
@@ -664,8 +745,8 @@ graph TB
         BRIDGE -->|broadcast| BROADCAST
         BROADCAST -->|WS message| WSCLIENT
         WSCLIENT -->|parseJSON| BRIDGE_RECV
-        BRIDGE_RECV -->|postEvent(DATA)| FSM
-        FSM -->|estado_corriendo| UPDATELOGIC
+        BRIDGE_RECV -->|postEvent(EVENTS.DATA)| FSM
+        FSM -->|process DATA| UPDATELOGIC
         UPDATELOGIC -->|map values| MAPXY
         MAPXY -->|store mapped| RXDATA
         MAPXY -->|calculate| TRANSFORMS
@@ -710,7 +791,7 @@ graph TD
         
         D["<b>CAPA 4: SERVIDOR - BROADCASTING</b><br/>════════════════════════════<br/>🖥️ bridgeServer.js (Node.js)<br/><br/><b>Responsabilidades:</b><br/>• Recibir adapters<br/>• Escuchar conexiones WS<br/>• Convertir JSON adaptador → WS msg<br/>• Broadcast a todos los clientes<br/>• Manejar estado de conexión<br/>• Logging y manejo de errores<br/><br/><b>Protocolo WS (JSON):</b><br/>{type:'microbit', x, y, btnA, btnB, t}<br/><br/>🔄 <b>Agnóstico al hardware:</b><br/>No sabe ni le importa qué adaptador"]
         
-        E["<b>CAPA 5: CLIENTE - RECEPCIÓN</b><br/>════════════════════════════<br/>🌐 bridgeClient.js (Navegador)<br/><br/><b>Responsabilidades:</b><br/>• Conectar WebSocket<br/>• Recibir mensajes JSON<br/>• Parsear JSON<br/>• Disparar eventos (EVENTS.DATA)<br/>• Pasar payload a FSM<br/><br/><b>Evento:</b><br/>bridge.onData(payload)<br/>→ painter.postEvent(DATA)<br/><br/>❌ <b>NO:</b><br/>Procesar, mapear o renderizar"]
+        E["<b>CAPA 5: CLIENTE - RECEPCIÓN</b><br/>════════════════════════════<br/>🌐 bridgeClient.js (Navegador)<br/><br/><b>Responsabilidades:</b><br/>• Conectar WebSocket<br/>• Recibir mensajes JSON<br/>• Parsear JSON<br/>• Disparar eventos (EVENTS.DATA)<br/>• Pasar payload a FSM<br/><br/><b>Evento:</b><br/>bridge.onData(payload)<br/>→ painter.postEvent(EVENTS.DATA)<br/><br/>❌ <b>NO:</b><br/>Procesar, mapear o renderizar"]
         
         F["<b>CAPA 6: ESTADO - FSM & MAPEO</b><br/>════════════════════════════<br/>🎯 PainterTask (p5.js)<br/><br/><b>Responsabilidades:</b><br/>• Máquina de estados finitos<br/>• Encolar eventos<br/>• Procesar evento DATA<br/>• Ejecutar updateLogic(data)<br/>• Mapear acelerómero → canvas<br/>• Map X: [-2048,2047] → [0,width]<br/>• Map Y: [-2048,2047] → [0,height]<br/>• Calcular circleResolution<br/>• Calcular radius<br/>• Detectar transición botones<br/>• Almacenar en rxData + generativeState<br/><br/>💾 <b>Estado:</b><br/>rxData, generativeState, prevBtnA"]
         
@@ -720,7 +801,7 @@ graph TD
         
         I["<b>CAPA 9: SALIDA - CANVAS & FEEDBACK</b><br/>════════════════════════════<br/>👁️ Canvas 720×720 (p5.js)<br/><br/><b>Outputs:</b><br/>• Polígonos generativos<br/>• Feedback visual en tiempo real<br/>• Refleja interacción del usuario<br/><br/><b>Observador:</b><br/>Usuario vea el resultado<br/>Cierra el loop de feedback"]
         
-        A -->|bytes ASCII| B
+        A -->|serial ASCII bytes| B
         B -->|rawLine| C
         C -->|{x,y,btnA,btnB}| D
         D -->|WS JSON| E
@@ -790,3 +871,8 @@ sfi1-2026-20-u4-CaseStudy-main/
 ├── fsm.js (máquina de estados base)
 └── index.html (UI)
 ```
+
+---
+
+**Última actualización**: Abril 15, 2026  
+**Versión del documento**: 1.0
