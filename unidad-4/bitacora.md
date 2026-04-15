@@ -1,5 +1,44 @@
 # unidad 4
 
+
+```py
+from microbit import *
+import utime
+
+# Configurar UART a 115200 baud
+uart.init(baudrate=115200)
+
+# Función para calcular checksum
+def calculate_checksum(x, y, a, b):
+    return abs(x) + abs(y) + a + b
+
+# Timestamp inicial
+start_time = utime.ticks_ms()
+
+while True:
+    # Leer acelerómetro (valores en mili-g, rango típico -2048 a 2047)
+    accel_x = accelerometer.get_x()
+    accel_y = accelerometer.get_y()
+    
+    # Leer botones (1 si presionado, 0 si no)
+    btn_a = 1 if button_a.is_pressed() else 0
+    btn_b = 1 if button_b.is_pressed() else 0
+    
+    # Calcular timestamp desde arranque
+    timestamp = utime.ticks_ms() - start_time
+    
+    # Calcular checksum
+    checksum = calculate_checksum(accel_x, accel_y, btn_a, btn_b)
+    
+    # Construir trama ASCII
+    frame = f"$T:{timestamp}|X:{accel_x}|Y:{accel_y}|A:{btn_a}|B:{btn_b}|CHK:{checksum}\n"
+    
+    # Enviar por UART
+    uart.write(frame)
+    
+    # Esperar para mantener 10 Hz (100ms)
+    sleep(100)
+```
 ## 1. Componentes del sistema
 
 | Componente | Tipo | Función principal | Entrada | Salida | Interacción |
